@@ -121,7 +121,7 @@ class AsteroidsGame:
             if self.count % 50 == 0:
                 ran = random.choice([1, 1, 1, 2, 2, 3])
                 self.list_of_asteroids.append(Asteroid(ran))
-            if self.count % 1500 == 0:
+            if self.count % 2000 == 0:
                 self.list_of_aliens.append(Alien())
 
             keys_pressed = pygame.key.get_pressed()
