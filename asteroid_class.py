@@ -23,8 +23,8 @@ class Asteroid:
         self.lifespan = 0
 
         # Choosing random point outside of play area to spawn asteroid in
-        self.ranPoint = random.choice([(random.randrange(0, WIDTH - self.width), random.choice([-1 * self.height - 5, HEIGHT + 5])),
-                                       (random.choice([-1 * self.width - 5, WIDTH + 5]), random.randrange(0, HEIGHT - self.height))])
+        self.ranPoint = random.choice([(random.randrange(0, WIDTH - self.width), random.choice([-1 * self.height - 5, HEIGHT + self.height])),
+                                       (random.choice([-1 * self.width - 5, WIDTH + self.width]), random.randrange(0, HEIGHT - self.height))])
         self.x, self.y = self.ranPoint
         self.hitbox = self.rotated_image.get_rect(x=(self.x - self.width), y=(self.y - self.height))
 
