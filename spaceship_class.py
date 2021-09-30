@@ -82,14 +82,14 @@ class Spaceship:
 
 class Bullet:
     def __init__(self, player_head, sine, cosine):
-        self.point = player_head
-        self.x, self.y = self.point
+        self.x, self.y = player_head
         self.width = 4
         self.height = 4
         self.sine = sine
         self.cosine = cosine
-        self.x_velocity = self.cosine * 10
-        self.y_velocity = self.sine * 10
+        self.speed = 10
+        self.x_velocity = self.cosine * self.speed
+        self.y_velocity = self.sine * self.speed
         self.hitbox = pygame.Rect(self.x, self.y, self.width, self.height)
 
     def move(self):
