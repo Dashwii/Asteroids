@@ -30,7 +30,6 @@ class Spaceship:
         self.booster_on = False
 
         # Bullets
-        self.list_of_bullets = []
         self.current_bullet_frame = 0
         self.bullets = BULLET_SPRITES[1:]
 
