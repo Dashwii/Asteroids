@@ -1,6 +1,7 @@
 from constants import *
 from spaceship_class import Spaceship
-from asteroid_class import Asteroid
+from projectile_bodies_class import ProjectileBody
+from projectile_bodies_class import Asteroid
 from alien_class import Alien
 
 
@@ -79,10 +80,15 @@ class AsteroidsGame:
         self.prev_time = time.time()
         self.dt = 0
         self.player = Spaceship()
+        self.rapid_fire = False
+        self.rapid_fire_activation_time = None
         self.count = 0
-        self.list_of_aliens = []
+        self.list_of_player_bullets = []
         self.list_of_asteroids = []
-        self.list_of_bullets = []
+        self.list_of_rapid_fire_powerups = []
+        self.list_of_aliens = []
+        self.list_of_alien_bullets = []
+        self.list_of_oneups = []
         self.bullet_cooldown = 0.1
         self.last_time_taken_damage = None
         self.invulnerable = False
@@ -90,7 +96,7 @@ class AsteroidsGame:
         self.score = 0
         self.score_text = LIVES_SCORE_FONT.render(f"SCORE: {self.score}", True, WHITE)
         self.lives_text = LIVES_SCORE_FONT.render(f"LIVES: {self.player.lives}x", True, WHITE)
-        self.game_over_text = GAME_OVER_FONT.render(f"GAME OVER! PRESS SPACE TO PLAY AGAIN OR ESC TO RETURN TO MENU.", True, WHITE)
+        self.game_over_text = GAME_OVER_FONT.render(f"GAME OVER! CLICK TO PLAY AGAIN OR ESC TO RETURN TO MENU.", True, WHITE)
         self.score_text_rect = self.score_text.get_rect(x=0, y=0)
         self.lives_text_rect = self.lives_text.get_rect(x=0, y=self.score_text_rect.y + self.score_text_rect.height)
         self.game_over_screen = False
@@ -111,82 +117,153 @@ class AsteroidsGame:
                     pygame.quit()
 
                 # Bullet Fire
-                if event.type == pygame.KEYDOWN and event.key == pygame.K_SPACE:
-                    if now - last_fire >= self.bullet_cooldown:
-                        self.list_of_bullets.append(self.player.shoot_bullet())
-                        last_fire = time.time()
-
+                if not self.rapid_fire:
+                    if event.type == pygame.KEYDOWN and event.key == pygame.K_SPACE:
+                        if now - last_fire >= self.bullet_cooldown:
+                            self.list_of_player_bullets.append(self.player.shoot_bullet())
+                            last_fire = time.time()
             self.count += 1
-            # After every 50 iterations spawn a new asteroid with a new size_rank
-            if self.count % 50 == 0:
-                ran = random.choice([1, 1, 1, 2, 2, 3])
-                self.list_of_asteroids.append(Asteroid(ran))
-            if self.count % 2000 == 0:
-                self.list_of_aliens.append(Alien())
 
             keys_pressed = pygame.key.get_pressed()
             if keys_pressed[pygame.K_ESCAPE]:
                 self.playing = False
+
+            if self.player.lives == 0:
+                self.game_over_screen = True
+                self.game_over_loop()
+
             if keys_pressed[pygame.K_w]:
                 self.player.booster_on = True
                 self.player.reset_momentum_check()
                 self.player.add_momentum()
 
-
-            if keys_pressed[pygame.K_d]:
-                self.player.rotate_ship_right()
-            if keys_pressed[pygame.K_a]:
-                self.player.rotate_ship_left()
-            if self.player.lives == 0:
-                self.game_over_screen = True
-                self.game_over_loop()
-
-
-            self.player.move_ship()
-            self.move_bullets()
-            self.move_asteroids()
-            self.check_asteroid_lifespan()
-            self.check_asteroid_bullet_collisions_append_new_asteroids()
-            self.move_aliens()
-            self.check_alien_collision()
-            self.alien_shoot_bullets()
-            self.check_alien_bullet_collision()
-            self.remove_bullets()
-
+            # After every 50 iterations spawn a new asteroid with a new size_rank
+            if self.count % 50 == 0:
+                ran = random.choice([1, 1, 1, 2, 2, 3])
+                self.list_of_asteroids.append(Asteroid(ran))
+            if self.count % 2500 == 0:
+                if random.randint(1, 3) == 3:
+                    self.list_of_aliens.append(Alien())
+            if self.count % 3000 == 0:
+                if random.randint(1, 5) == 5:
+                    self.list_of_rapid_fire_powerups.append(ProjectileBody(STAR_SPRITE))
+            if self.count % 2700 == 0:
+                if random.randint(1, 2) == 2:
+                    self.list_of_oneups.append(ProjectileBody(HEART_SPRITE))
+            if self.rapid_fire:
+                if time.time() - self.rapid_fire_activation_time > 5:
+                    self.rapid_fire = False
+                self.list_of_player_bullets.append(self.player.shoot_bullet())
             if self.invulnerable:
                 self.flick += 1
                 if time.time() - self.last_time_taken_damage > 1.5:
                     self.flick = 0
                     self.invulnerable = False
 
-            self.blit_screen()
+            if keys_pressed[pygame.K_d]:
+                self.player.rotate_ship_right()
+            if keys_pressed[pygame.K_a]:
+                self.player.rotate_ship_left()
+
+            self.player.move_ship()
+            self.remove_bullets(self.list_of_player_bullets)
+            self.remove_bullets(self.list_of_alien_bullets)
+            self.move_bullets(self.list_of_player_bullets)
+            self.move_bullets(self.list_of_alien_bullets)
+            self.move_projectile_bodies(self.list_of_asteroids)
+            self.move_projectile_bodies(self.list_of_rapid_fire_powerups)
+            self.move_projectile_bodies(self.list_of_oneups)
+            self.check_asteroid_collision()
+            self.check_asteroid_lifespan()
+            self.check_powerup_collisions(self.list_of_rapid_fire_powerups)
+            self.check_powerup_collisions(self.list_of_oneups)
+            self.move_aliens()
+            self.check_alien_collision()
+            self.alien_shoot_bullets()
+            self.check_alien_bullet_collision()
             self.give_aliens_target()
+
+            self.blit_screen()
             self.player.booster_on = False
 
     def blit_screen(self):
-        WINDOW.fill(BLACK)
+        WINDOW.blit(BACKGROUND, (0, 0))
         if self.invulnerable:
             if self.flick % 5 == 0:
                 self.player.draw_ship()
         else:
             self.player.draw_ship()
-        self.draw_bullets()
-        self.draw_asteroids()
+        self.draw_projectile_bodies(self.list_of_asteroids)
+        self.draw_projectile_bodies(self.list_of_rapid_fire_powerups)
+        self.draw_projectile_bodies(self.list_of_oneups)
         self.draw_aliens()
+        self.draw_bullets(self.list_of_player_bullets)
+        self.draw_bullets(self.list_of_alien_bullets)
         self.score_text = LIVES_SCORE_FONT.render(f"SCORE: {self.score}", True, WHITE)
         self.lives_text = LIVES_SCORE_FONT.render(f"LIVES: {self.player.lives}x", True, WHITE)
         WINDOW.blit(self.score_text, self.score_text_rect)
         WINDOW.blit(self.lives_text, self.lives_text_rect)
         pygame.display.update()
 
-    def move_asteroids(self):
-        for asteroid in self.list_of_asteroids:
-            asteroid.move_asteroid()
+    @staticmethod
+    def move_projectile_bodies(projectile_body_list):
+        for projectile_body in projectile_body_list:
+            projectile_body.move()
 
-    def draw_asteroids(self):
-        for asteroid in self.list_of_asteroids:
-            asteroid.rotate_asteroid()
-            asteroid.draw()
+    @staticmethod
+    def draw_projectile_bodies(projectile_body_list):
+        for projectile_body in projectile_body_list:
+            projectile_body.draw()
+
+    def check_asteroid_collision(self):
+        # For whatever dumbass reason, using del throws IndexErrors left, right, and center. Pop seems to cause less errors.
+        # Adding return statements seem to remedy the issue fully. No more crashes, and no more random objects deleting themselves due to index erros. ¯\_(ツ)_/¯
+
+        for idx, asteroid in enumerate(self.list_of_asteroids[:]):
+            if asteroid.hitbox.colliderect(self.player.hitbox) and not self.invulnerable:
+                self.taken_damage()
+                self.asteroid_splitting(asteroid)
+                self.list_of_asteroids.pop(idx)
+                return
+            for idy, bullet in enumerate(self.list_of_player_bullets[:]):
+                if bullet.hitbox.colliderect(asteroid.hitbox):
+                    self.score += asteroid.score_given
+                    self.asteroid_splitting(asteroid)
+                    self.list_of_player_bullets.pop(idy)
+                    self.list_of_asteroids.pop(idx)
+                    return
+
+    def asteroid_splitting(self, a):
+        if a.size_rank == 3:
+            new_asteroids = [Asteroid(2) for _ in range(2)]
+            new_asteroids[0].x, new_asteroids[0].y = a.x, a.y
+            new_asteroids[1].x, new_asteroids[1].y = a.x, a.y
+            [self.list_of_asteroids.append(i) for i in new_asteroids]
+        if a.size_rank == 2:
+            new_asteroids = [Asteroid(1) for _ in range(2)]
+            new_asteroids[0].x, new_asteroids[0].y = a.x, a.y
+            new_asteroids[1].x, new_asteroids[1].y = a.x, a.y
+            [self.list_of_asteroids.append(i) for i in new_asteroids]
+
+    def check_asteroid_lifespan(self):
+        for idx, asteroid in enumerate(self.list_of_asteroids[:]):
+            asteroid.lifespan += 1
+            if asteroid.lifespan % 1500 == 0:
+                self.list_of_asteroids.pop(self.list_of_asteroids.index(asteroid))
+
+    def check_powerup_collisions(self, list_of_powerup):
+        if list_of_powerup == self.list_of_oneups:
+            for idx, powerup in enumerate(list_of_powerup[:]):
+                if self.player.hitbox.colliderect(powerup.hitbox):
+                    if self.player.lives < 3:
+                        self.player.lives += 1
+                        self.list_of_oneups.pop(idx)
+        elif list_of_powerup == self.list_of_rapid_fire_powerups:
+            for idx, powerup in enumerate(list_of_powerup[:]):
+                if self.player.hitbox.colliderect(powerup.hitbox):
+                    self.rapid_fire_activation_time = time.time()
+                    self.rapid_fire = True
+                    self.list_of_rapid_fire_powerups.pop(idx)
 
     def move_aliens(self):
         for alien in self.list_of_aliens:
@@ -209,76 +286,42 @@ class AsteroidsGame:
                 if not self.invulnerable:
                     alien.health -= 20
                     if alien.health <= 0:
-                        del self.list_of_aliens[idx]
+                        self.list_of_aliens.pop(idx)
                     self.taken_damage()
-
-            for idy, b in enumerate(self.list_of_bullets):
-                if hasattr(b, "alien_bullet"):
-                    continue
+                    return
+            for idy, b in enumerate(self.list_of_player_bullets[:]):
                 if alien.hitbox.colliderect(b.hitbox):
-                    del self.list_of_bullets[idy]
+                    self.list_of_player_bullets.pop(idy)
                     alien.health -= 10
                     if alien.health <= 0:
-                        del self.list_of_aliens[idx]
+                        self.score += 125
+                        self.list_of_aliens.pop(idx)
+                    return
+
 
     def check_alien_bullet_collision(self):
-        for idx, bullet in enumerate(self.list_of_bullets):
+        for idx, bullet in enumerate(self.list_of_alien_bullets[:]):
             if hasattr(bullet, "alien_bullet"):
                 if bullet.hitbox.colliderect(self.player.hitbox) and not self.invulnerable:
-                    del self.list_of_bullets[idx]
+                    self.list_of_alien_bullets.pop(idx)
                     self.taken_damage()
 
-    def check_asteroid_bullet_collisions_append_new_asteroids(self):
-        for idx, asteroid in enumerate(self.list_of_asteroids):
-            if asteroid.hitbox.colliderect(self.player.hitbox) and not self.invulnerable:
-                self.taken_damage()
-                self.asteroid_splitting(asteroid)
-                del self.list_of_asteroids[idx]
-
-            for idy, bullet in enumerate(self.list_of_bullets):
-                if hasattr(bullet, "alien_bullet"):
-                    continue
-                if asteroid.hitbox.colliderect(bullet.hitbox):
-                    self.score += asteroid.score_given
-                    # Give new asteroids same position as old one
-                    self.asteroid_splitting(asteroid)
-                    del self.list_of_asteroids[idx]
-                    del self.list_of_bullets[idy]
-
-    def asteroid_splitting(self, a):
-        if a.size_rank == 3:
-            new_asteroids = [Asteroid(2) for _ in range(2)]
-            new_asteroids[0].x, new_asteroids[0].y = a.x, a.y
-            new_asteroids[1].x, new_asteroids[1].y = a.x, a.y
-            [self.list_of_asteroids.append(i) for i in new_asteroids]
-        if a.size_rank == 2:
-            new_asteroids = [Asteroid(1) for _ in range(2)]
-            new_asteroids[0].x, new_asteroids[0].y = a.x, a.y
-            new_asteroids[1].x, new_asteroids[1].y = a.x, a.y
-            [self.list_of_asteroids.append(i) for i in new_asteroids]
-
-    def check_asteroid_lifespan(self):
-        for idx, asteroid in enumerate(self.list_of_asteroids[:]):
-            asteroid.lifespan += 1
-            if asteroid.lifespan % 1500 == 0:
-                del self.list_of_asteroids[idx]
-
-    def append_new_asteroids_to_list(self, asteroids_to_append):
-        self.list_of_asteroids += asteroids_to_append
-
-    def move_bullets(self):
-        for bullet in self.list_of_bullets:
+    @staticmethod
+    def move_bullets(bullet_list):
+        for bullet in bullet_list:
             bullet.move()
 
-    def remove_bullets(self):
-        for idx, bullet in enumerate(self.list_of_bullets):
-            if bullet.x > WIDTH or bullet.x < 0:
-                del self.list_of_bullets[idx]
-            elif bullet.y > HEIGHT or bullet.y < 0:
-                del self.list_of_bullets[idx]
+    @staticmethod
+    def remove_bullets(bullet_list):
+        for idx, bullet in enumerate(bullet_list):
+            if bullet.x > WIDTH + 100 or bullet.x < -100:
+                bullet_list.pop(bullet_list.index(bullet))
+            elif bullet.y > HEIGHT + 100 or bullet.y < -100:
+                bullet_list.pop(bullet_list.index(bullet))
 
-    def draw_bullets(self):
-        for bullet in self.list_of_bullets:
+    @staticmethod
+    def draw_bullets(bullet_list):
+        for bullet in bullet_list:
             bullet.draw()
 
     def taken_damage(self):
@@ -290,7 +333,7 @@ class AsteroidsGame:
         for alien in self.list_of_aliens:
             alien.bullet_timer += 1
             if alien.bullet_timer % 200 == 0:
-                self.list_of_bullets.append(alien.shoot_bullet(self.player.hitbox.x + self.player.width // 2, self.player.hitbox.y + self.player.height // 2))
+                self.list_of_alien_bullets.append(alien.shoot_bullet(self.player.hitbox.x + self.player.width // 2, self.player.hitbox.y + self.player.height // 2))
 
     def game_over_loop(self):
         while self.game_over_screen:
@@ -298,23 +341,26 @@ class AsteroidsGame:
                 if event.type == pygame.QUIT:
                     self.playing = False
                     pygame.quit()
+                if event.type == pygame.MOUSEBUTTONDOWN:
+                    self.game_over_screen = False
+                    self.reset_game()
                 keys_pressed = pygame.key.get_pressed()
                 if keys_pressed[pygame.K_ESCAPE]:
                     self.game_over_screen = False
                     self.playing = False
                     return
-                if keys_pressed[pygame.K_SPACE]:
-                    self.game_over_screen = False
-                    self.reset_game()
             WINDOW.blit(self.game_over_text, (MIDDLE_W - self.game_over_text.get_width() // 2, MIDDLE_H))
             pygame.display.update()
 
     def reset_game(self):
         self.list_of_asteroids = []
-        self.list_of_bullets = []
+        self.list_of_rapid_fire_powerups = []
+        self.list_of_oneups = []
+        self.list_of_player_bullets = []
+        self.list_of_alien_bullets = []
         self.list_of_aliens = []
         self.score = 0
-        self.count = 0
+        self.count = 1
         self.flick = 0
         self.invulnerable = False
         del self.player
