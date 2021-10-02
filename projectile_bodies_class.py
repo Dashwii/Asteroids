@@ -8,6 +8,7 @@ class ProjectileBody:
         self.x, self.y = random.choice([(random.randrange(0, WIDTH - self.width), random.choice([-1 * self.height - 5, HEIGHT + self.height])),
                                        (random.choice([-1 * self.width - 5, WIDTH + self.width]), random.randrange(0, HEIGHT - self.height))])
         self.hitbox = self.image.get_rect(x=self.x, y=self.y)
+        self.hitbox_middle = (self.hitbox.x + self.hitbox.width // 2, self.hitbox.y + self.hitbox.height // 2)
 
         if self.x < WIDTH // 2:
             self.x_dir = 1
@@ -28,6 +29,7 @@ class ProjectileBody:
         self.x += self.x_velocity
         self.y += self.y_velocity
         self.hitbox.x, self.hitbox.y = self.x, self.y
+        self.hitbox_middle = (self.hitbox.x + self.hitbox.width // 2, self.hitbox.y + self.hitbox.height // 2)
 
 
 class Asteroid(ProjectileBody):
@@ -42,33 +44,18 @@ class Asteroid(ProjectileBody):
         else:
             self.score_given = 100
             self.image = ASTEROID_SPRITES[0]
+
         self.angle = 0
         self.rotate_speed = random.randint(1, 3)
         self.rotated_image = pygame.transform.rotate(self.image, self.angle)
-        self.width = self.rotated_image.get_width()
-        self.height = self.rotated_image.get_height()
-        self.hitbox_width = self.image.get_width()
-        self.hitbox_height = self.image.get_height()
         self.lifespan = 0
 
         super().__init__(self.image)
 
-    # def draw(self):
-    #     WINDOW.blit(self.rotated_image, (self.x - self.width // 2, self.y - self.height // 2))
+    def draw(self):
+        self.rotate_asteroid()
+        WINDOW.blit(self.rotated_image, (self.hitbox_middle[0] - (self.rotated_image.get_width() // 2), self.hitbox_middle[1] - self.rotated_image.get_height() // 2))
 
     def rotate_asteroid(self):
         self.angle = (self.angle + self.rotate_speed) % 360
         self.rotated_image = pygame.transform.rotate(self.image, self.angle)
-        self.width = self.rotated_image.get_width()
-        self.height = self.rotated_image.get_height()
-
-    # def move_asteroid(self):
-    #     self.x += self.x_velocity
-    #     self.y += self.y_velocity
-    #     self.hitbox = pygame.Rect(self.x - self.hitbox_width // 2, self.y - self.hitbox_height // 2, self.hitbox_width, self.hitbox_height)
-
-
-class PowerUp(ProjectileBody):
-    def __init__(self):
-        self.image = STAR_SPRITE
-        super().__init__(self.image)
